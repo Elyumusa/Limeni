@@ -1,26 +1,56 @@
 @import "tailwindcss";
 
+/* Earthy palette: sand background, leaf green for actions, maize gold as the accent. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8f5ee;
+  --foreground: #231d16;
+  --leaf: #1f6b3a;
+  --leaf-dark: #154d29;
+  --leaf-soft: #e3efe4;
+  --maize: #d99a1e;
+  --maize-soft: #fbf0d6;
+  --clay: #a8471f;
+  --line: #e4ddcf;
+  --card: #ffffff;
+  --muted: #6b6255;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-leaf: var(--leaf);
+  --color-leaf-dark: var(--leaf-dark);
+  --color-leaf-soft: var(--leaf-soft);
+  --color-maize: var(--maize);
+  --color-maize-soft: var(--maize-soft);
+  --color-clay: var(--clay);
+  --color-line: var(--line);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-fraunces);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Keep Leaflet's map controls under the sticky header. */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 1 !important;
 }
