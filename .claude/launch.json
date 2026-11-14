@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "limashift",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": [
+        "-ic",
+        "npm run dev"
+      ],
+      "port": 3000
+    }
+  ]
+}
