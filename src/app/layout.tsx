@@ -18,7 +18,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "LimaShift",
+  title: "Limeni",
   description:
     "Plan what to plant next season. Crop rotation suggestions for Zambian farmers, checked against 45 years of satellite weather records.",
 };

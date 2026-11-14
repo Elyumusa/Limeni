@@ -1,6 +1,6 @@
-# LimaShift — implementation plan
+# Limeni — implementation plan
 
-Working name: **LimaShift** ("lima" = to farm, and a Zambian unit of land). Change it freely.
+Name: **Limeni**.
 
 NASA Space Apps 2026 · Challenge: *Field Shift: Adapting Farms with NASA Data* · Solo build · Region: Zambia
 

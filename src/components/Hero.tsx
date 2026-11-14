@@ -34,7 +34,7 @@ export default function Hero() {
   return (
     <section
       aria-roledescription="carousel"
-      aria-label="Farmers using LimaShift"
+      aria-label="Farmers using Limeni"
       className="relative isolate overflow-hidden bg-leaf-dark"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -72,7 +72,7 @@ export default function Hero() {
           Know what to plant next season
         </h1>
         <p className="mt-5 max-w-lg text-lg leading-relaxed text-white/90">
-          LimaShift checks 45 years of satellite weather records for your area and suggests crop
+          Limeni checks 45 years of satellite weather records for your area and suggests crop
           rotations that suit your land, your goals and the rain you can count on.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">

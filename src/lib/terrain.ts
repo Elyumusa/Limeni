@@ -37,7 +37,7 @@ export async function fetchTerrain(lat: number, lon: number): Promise<Terrain> {
   ];
   const locations = points.map(([a, b]) => `${a.toFixed(5)},${b.toFixed(5)}`).join("|");
   const res = await fetch(`https://api.opentopodata.org/v1/srtm30m?locations=${locations}`, {
-    headers: { "User-Agent": "LimaShift (NASA Space Apps 2026 prototype)" },
+    headers: { "User-Agent": "Limeni (NASA Space Apps 2026 prototype)" },
     signal: AbortSignal.timeout(15_000),
     next: { revalidate: 60 * 60 * 24 * 30 },
   });

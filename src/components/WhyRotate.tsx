@@ -75,7 +75,7 @@ export default function WhyRotate() {
             <p className="text-sm font-semibold uppercase tracking-[0.14em] text-clay">An example</p>
             <h3 className="mt-2 font-display text-2xl leading-snug">A new farm near Mkushi</h3>
             <p className="mt-3 leading-relaxed text-muted">
-              Choosing a crop is a gamble: will there be enough rain, and will it sell? LimaShift checks each
+              Choosing a crop is a gamble: will there be enough rain, and will it sell? Limeni checks each
               option against every rainy season since 1981 in your area, so you can see the risk before you
               spend money on seed.
             </p>

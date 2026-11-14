@@ -78,8 +78,8 @@ function Section({ title, items, open = false }: { title: string; items: string[
   );
 }
 
-const PRICES_KEY = "limashift.prices.v1";
-const SOIL_KEY = "limashift.soil.v1";
+const PRICES_KEY = "limeni.prices.v1";
+const SOIL_KEY = "limeni.soil.v1";
 const kwacha = (n: number) => `K${n.toLocaleString("en-US")}`;
 
 function ValueLine({ value }: { value: RotationResult["value"] }) {

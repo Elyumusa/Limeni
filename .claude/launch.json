@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "limashift",
+      "name": "limeni",
       "runtimeExecutable": "zsh",
       "runtimeArgs": [
         "-ic",

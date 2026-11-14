@@ -1,4 +1,4 @@
-# LimaShift
+# Limeni
 
 Crop rotation guidance for Zambian farmers, built on NASA data.
 NASA Space Apps 2026 — *Field Shift: Adapting Farms with NASA Data*.

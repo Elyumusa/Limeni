@@ -37,7 +37,7 @@ async function reverse(lat: number, lon: number): Promise<Response> {
   const params = new URLSearchParams({ lat: String(lat), lon: String(lon), lang: "en", limit: "1" });
   try {
     const res = await fetch(`https://photon.komoot.io/reverse?${params}`, {
-      headers: { "User-Agent": "LimaShift (NASA Space Apps 2026 prototype)" },
+      headers: { "User-Agent": "Limeni (NASA Space Apps 2026 prototype)" },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) throw new Error(`Photon returned ${res.status}`);
@@ -71,7 +71,7 @@ export async function GET(request: Request): Promise<Response> {
   const params = new URLSearchParams({ q, limit: "8", lang: "en", bbox: `${b.west},${b.south},${b.east},${b.north}` });
   try {
     const res = await fetch(`https://photon.komoot.io/api/?${params}`, {
-      headers: { "User-Agent": "LimaShift (NASA Space Apps 2026 prototype)" },
+      headers: { "User-Agent": "Limeni (NASA Space Apps 2026 prototype)" },
       next: { revalidate: 86_400 },
       signal: AbortSignal.timeout(8000),
     });

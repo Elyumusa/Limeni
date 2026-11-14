@@ -22,7 +22,7 @@ const TERMS: { term: string; plain: string }[] = [
   {
     term: "Water balance",
     plain:
-      "Rain coming in compared with water going out (evapotranspiration and runoff). LimaShift's simple version compares each season's rain with what each crop needs, from FAO's crop records.",
+      "Rain coming in compared with water going out (evapotranspiration and runoff). Limeni's simple version compares each season's rain with what each crop needs, from FAO's crop records.",
   },
   {
     term: "Dry spell",
@@ -37,7 +37,7 @@ const TERMS: { term: string; plain: string }[] = [
   {
     term: "Frost",
     plain:
-      "Below-freezing nights. Rare in Zambia's rainy season, so LimaShift does not score it; it matters for winter crops grown with irrigation.",
+      "Below-freezing nights. Rare in Zambia's rainy season, so Limeni does not score it; it matters for winter crops grown with irrigation.",
   },
 ];
 

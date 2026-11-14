@@ -9,7 +9,7 @@ export default function Home() {
       <header className="absolute inset-x-0 top-0 z-10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
           <a href="#" className="font-display text-2xl text-white">
-            LimaShift
+            Limeni
           </a>
           <nav className="flex gap-5 text-sm font-medium text-white/90">
             <a href="#why" className="hidden hover:text-white sm:inline">
@@ -32,7 +32,7 @@ export default function Home() {
 
       <footer className="border-t border-line bg-card">
         <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-muted">
-          <p className="font-display text-xl text-foreground">LimaShift</p>
+          <p className="font-display text-xl text-foreground">Limeni</p>
           <p className="mt-1">Built for the NASA Space Apps Challenge 2026 · Field Shift: Adapting Farms with NASA Data</p>
           <h2 className="mt-6 font-semibold text-foreground">Where the numbers come from</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">

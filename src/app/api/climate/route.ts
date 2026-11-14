@@ -19,7 +19,7 @@ function parsePoint(lat: unknown, lon: unknown): { lat: number; lon: number } | 
   const la = Number(lat);
   const lo = Number(lon);
   if (!Number.isFinite(la) || !Number.isFinite(lo)) return "Latitude and longitude must be numbers.";
-  if (!inZambiaBox(la, lo)) return "That point is outside Zambia. LimaShift's crop data covers Zambia only.";
+  if (!inZambiaBox(la, lo)) return "That point is outside Zambia. Limeni's crop data covers Zambia only.";
   return { lat: Math.round(la * 100) / 100, lon: Math.round(lo * 100) / 100 };
 }
 
