@@ -191,6 +191,10 @@ Each phase ends with something that works. Do not start a phase until the one be
 - [x] S2 Farmer's soil: type in pH (water or CaCl₂), texture, drainage, organic carbon or fertility, or upload a photo / PDF of a soil test (read by DeepSeek, checked by the farmer). Scored with FAO ECOCROP pH, texture, fertility and drainage limits
 - [x] Small screens: checked at 320 px; price list stacks, larger tap targets, compact step headers
 - [ ] Optional later: SoilGrids / iSDAsoil estimate for farmers with no soil information
+- [x] "What if" scenario: less rain (−10/−20/−30%) and more hot days (+10/+20), replayed over 45 seasons
+- [x] Farming calendar: planting time, growing period, sensitive stage vs dry-spell and heat months, bare-field months, mulch advice
+- [x] Root-zone soil moisture (NASA POWER) shown as typical level and season-by-season anomaly; "Words explained" glossary
+- [x] Erosion risk from NASA SRTM slope; ground cover now counts in soil health on sloping land
 - [ ] Map legends for the satellite layers
 - [x] S3 Tap anywhere in Zambia, plus place search with autocomplete (Photon / OpenStreetMap). Live CHIRPS + NASA POWER via `/api/climate`; takes 20 s–2 min because ClimateSERV is a queue
 - [x] Farmer-entered crop prices, now and expected at harvest, saved on the device; change the rough value, not the ranking

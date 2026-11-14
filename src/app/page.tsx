@@ -12,7 +12,7 @@ export default function Home() {
             LimaShift
           </a>
           <nav className="flex gap-5 text-sm font-medium text-white/90">
-            <a href="#why" className="hover:text-white">
+            <a href="#why" className="hidden hover:text-white sm:inline">
               How it works
             </a>
             <a href="#plan" className="hover:text-white">

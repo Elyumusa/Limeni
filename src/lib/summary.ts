@@ -11,6 +11,8 @@ import { TEXTURE_WORDS, fertilityOf, hasSoil, phInWater, type SoilInfo } from "@
 export type SummaryFacts = {
   place: string;
   startingOut: boolean;
+  /** A "what if" weather scenario the farmer is looking at, or null for past weather as it was. */
+  scenario: string | null;
   /** What the farmer told us about their soil, if anything. */
   soil: { phInWater?: number; texture?: string; drainage?: string; fertility?: string } | null;
   climate: {
@@ -48,11 +50,13 @@ export function buildFacts(
   results: RotationResult[],
   startingOut: boolean,
   soil: SoilInfo = {},
+  scenario: string | null = null,
 ): SummaryFacts {
   const s = climate.summary;
   return {
     place,
     startingOut,
+    scenario,
     soil: hasSoil(soil)
       ? {
           phInWater: phInWater(soil),
@@ -91,6 +95,7 @@ export function templateSummary(f: SummaryFacts): string {
   const c = f.climate;
   const parts: string[] = [];
 
+  if (f.scenario) parts.push(`This is a "what if" view, with ${f.scenario}.`);
   parts.push(
     `In ${f.place}, the rains usually start around ${c.rainsStart ?? "mid-November"}. ` +
       `In 4 years out of 5 you can count on at least ${c.reliableRainMm} mm of rain` +

@@ -6,6 +6,7 @@
 import { CROPS, FALLOW, cropById, type Crop } from "@/data/crops";
 import type { ClimateProfile } from "@/lib/climate";
 import { hasSoil, soilFit, type SoilFit, type SoilInfo } from "@/lib/soil";
+import type { Terrain } from "@/lib/terrain";
 
 /** Prices the farmer typed in, ZMW per kg: what buyers pay now, and what they expect at harvest. */
 export type PriceOverrides = Record<string, { now?: number; harvest?: number }>;
@@ -132,8 +133,13 @@ export function cropFit(crop: Crop, climate: ClimateProfile, soilInfo: SoilInfo 
   };
 }
 
-function soilScore(crops: Crop[]): number {
+const COVER_POINTS = { low: -4, medium: 2, high: 6 };
+
+function soilScore(crops: Crop[], terrain: Terrain | null): number {
   let score = 50;
+  // On sloping land, crops that cover the ground protect the soil from washing away.
+  const slopeWeight = terrain?.erosionRisk === "high" ? 1 : terrain?.erosionRisk === "moderate" ? 0.5 : 0;
+  for (const c of crops) score += slopeWeight * COVER_POINTS[c.groundCover];
   for (const c of crops) {
     // A resting season neither feeds nor drains the soil much.
     if (c.family === "fallow") {
@@ -160,13 +166,13 @@ function pestScore(crops: Crop[]): number {
   return clamp(score);
 }
 
-function scoreRotation(crops: Crop[], fits: Map<string, CropFit>, p: Priorities): RotationScores {
+function scoreRotation(crops: Crop[], fits: Map<string, CropFit>, p: Priorities, terrain: Terrain | null): RotationScores {
   // Resting seasons count for soil and pests, but not for climate fit, water or market.
   const planted = crops.filter((c) => c.family !== "fallow");
   const f = planted.map((c) => fits.get(c.id) as CropFit);
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
   const water = planted.length ? clamp(mean(f.map((x) => x.waterSafety * 100))) : 100;
-  const soil = soilScore(crops);
+  const soil = soilScore(crops, terrain);
   const pest = pestScore(crops);
   const market = clamp((mean(planted.map((c) => c.market)) / 3) * 100);
   const fit = planted.length ? clamp(mean(f.map((x) => x.score))) : 100;
@@ -195,6 +201,7 @@ function explain(
   currentIsReal: boolean,
   prices: PriceOverrides,
   soilInfo: SoilInfo,
+  terrain: Terrain | null,
 ): Omit<RotationResult, "cropIds" | "crops" | "kind" | "scores"> {
   const s = climate.summary;
   const rests = crops.filter((c) => c.family === "fallow").length;
@@ -238,6 +245,10 @@ function explain(
     );
   }
   for (const c of distinct) evidence.push(...(fits.get(c.id) as CropFit).soil.notes);
+  if (terrain)
+    evidence.push(
+      `NASA SRTM elevation: the land around this point slopes about ${terrain.slopePct}% (${terrain.erosionRisk} erosion risk).`,
+    );
   evidence.push(
     `Seasons with a dry spell of 10 or more days in January–February: ${Math.round(s.drySpellRisk * s.seasons)} of ${s.seasons}.`,
   );
@@ -251,6 +262,11 @@ function explain(
   if (distinct.length >= 3) benefits.push("Three different crops spread the risk: one bad season is less likely to hurt all of them.");
   if (rests)
     benefits.push(`${rests === 1 ? "A resting season gives" : "Resting seasons give"} the soil time to recover, but ${rests === 1 ? "it earns" : "they earn"} nothing.`);
+  const covering = distinct.filter((c) => c.groundCover === "high");
+  if (terrain && terrain.erosionRisk !== "low" && covering.length)
+    benefits.push(
+      `${list(covering.map((c) => c.name))} ${covering.length > 1 ? "cover" : "covers"} the ground, which protects sloping soil from washing away in heavy rain.`,
+    );
   if (!benefits.length) benefits.push("Simple to manage: one crop, one set of inputs, a known market.");
 
   const risks: string[] = [];
@@ -268,6 +284,11 @@ function explain(
     if (f.tooWet) risks.push(`Typical rainfall here is above ${c.name.toLowerCase()}'s ideal range, which raises disease risk.`);
   }
   for (const c of distinct) risks.push(...(fits.get(c.id) as CropFit).soil.problems);
+  const bareRows = distinct.filter((c) => c.groundCover === "low");
+  if (terrain && terrain.erosionRisk !== "low" && bareRows.length)
+    risks.push(
+      `The land here slopes about ${terrain.slopePct}%. ${list(bareRows.map((c) => c.name))} ${bareRows.length > 1 ? "leave" : "leaves"} soil bare between rows, so plant along the contour and keep crop residue on the field.`,
+    );
   if (distinct.some((c) => c.id === "soybean") && soilInfo.ph === undefined)
     risks.push("Soybean dislikes acidic soil. Test soil pH first; lime may be needed.");
   if (distinct.some((c) => c.id === "groundnut")) risks.push("Groundnut needs calcium to fill its pods and prefers lighter soils.");
@@ -343,52 +364,60 @@ export function compareRotations(
   priorities: Priorities,
   prices: PriceOverrides = {},
   soil: SoilInfo = {},
+  terrain: Terrain | null = null,
 ): { results: RotationResult[]; fits: CropFit[] } {
   const fits = new Map(CROPS.map((c) => [c.id, cropFit(c, climate, soil)]));
   const currentIsReal = currentIds !== null && currentIds.some((id) => id !== FALLOW.id);
   if (!currentIsReal) currentIds = COMMON_PRACTICE;
   const current = (currentIds as string[]).map((id) => cropById(id) as Crop);
-  const currentScores = scoreRotation(current, fits, priorities);
+  const currentScores = scoreRotation(current, fits, priorities, terrain);
   const currentKey = cycleKey(current.map((c) => c.id));
 
-  const suited = CROPS.filter((c) => (fits.get(c.id) as CropFit).score >= MIN_FIT);
-  const seen = new Set<string>([currentKey]);
-  const candidates: { crops: Crop[]; scores: RotationScores }[] = [];
-  for (const a of suited)
-    for (const b of suited)
-      for (const c of suited) {
-        // Never the same crop twice: repeating a crop is what a rotation is meant to avoid.
-        if (a === b || b === c || a === c) continue;
-        const crops = [a, b, c];
-        // A farm household needs a staple grain somewhere in the rotation.
-        if (!crops.some((x) => x.family === "cereal")) continue;
-        const key = cycleKey(crops.map((x) => x.id));
-        if (seen.has(key)) continue;
-        seen.add(key);
-        candidates.push({ crops, scores: scoreRotation(crops, fits, priorities) });
-      }
-  candidates.sort((x, y) => y.scores.overall - x.scores.overall || y.scores.fit - x.scores.fit);
+  const build = (minFit: number) => {
+    const suited = CROPS.filter((c) => (fits.get(c.id) as CropFit).score >= minFit);
+    const seen = new Set<string>([currentKey]);
+    const list: { crops: Crop[]; scores: RotationScores }[] = [];
+    for (const a of suited)
+      for (const b of suited)
+        for (const c of suited) {
+          // Never the same crop twice: repeating a crop is what a rotation is meant to avoid.
+          if (a === b || b === c || a === c) continue;
+          const crops = [a, b, c];
+          // A farm household needs a staple grain somewhere in the rotation.
+          if (!crops.some((x) => x.family === "cereal")) continue;
+          const key = cycleKey(crops.map((x) => x.id));
+          if (seen.has(key)) continue;
+          seen.add(key);
+          list.push({ crops, scores: scoreRotation(crops, fits, priorities, terrain) });
+        }
+    return list.sort((x, y) => y.scores.overall - x.scores.overall || y.scores.fit - x.scores.fit);
+  };
+  const candidates = build(MIN_FIT);
+  // In a harsh climate few crops pass; widen the search so there is still a choice.
+  const wider = build(MIN_FIT - 20);
 
-  const best = candidates[0];
-  // The second option should be a real alternative, not the best one with a single swap.
+  let best = candidates[0] ?? wider[0];
   const bestIds = new Set(best?.crops.map((c) => c.id));
-  const shared = (c: (typeof candidates)[number]) => c.crops.filter((x) => bestIds.has(x.id)).length;
+  const shared = (c: { crops: Crop[] }) => c.crops.filter((x) => bestIds.has(x.id)).length;
   // Prefer sharing at most one crop with the best; never the same three crops in another order.
   const alternative =
-    candidates.slice(1).find((c) => shared(c) <= 1) ??
-    candidates.slice(1).find((c) => shared(c) < 3) ??
-    candidates[1];
+    candidates.find((c) => c !== best && shared(c) <= 1) ??
+    candidates.find((c) => c !== best && shared(c) < 3) ??
+    wider.find((c) => c !== best && shared(c) < 3);
+  let second = alternative;
+  // A wider-search option can outscore the first pick; "best" must always be the highest score.
+  if (second && best && second.scores.overall > best.scores.overall) [best, second] = [second, best];
 
   const make = (crops: Crop[], kind: RotationResult["kind"], scores: RotationScores): RotationResult => ({
     cropIds: crops.map((c) => c.id),
     crops,
     kind,
     scores,
-    ...explain(crops, kind, scores, fits, climate, current, currentScores, currentIsReal, prices, soil),
+    ...explain(crops, kind, scores, fits, climate, current, currentScores, currentIsReal, prices, soil, terrain),
   });
 
   const results = [make(current, currentIsReal ? "current" : "common", currentScores)];
   if (best) results.push(make(best.crops, "best", best.scores));
-  if (alternative) results.push(make(alternative.crops, "alternative", alternative.scores));
+  if (second) results.push(make(second.crops, "alternative", second.scores));
   return { results, fits: [...fits.values()].sort((a, b) => b.score - a.score) };
 }

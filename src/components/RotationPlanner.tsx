@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import FarmingCalendar from "@/components/FarmingCalendar";
 import PricePanel from "@/components/PricePanel";
 import SoilPanel from "@/components/SoilPanel";
+import { NO_SCENARIO, applyScenario, describeScenario, isScenario, type Scenario } from "@/lib/scenario";
 import type { SoilInfo } from "@/lib/soil";
+import type { Terrain } from "@/lib/terrain";
 import StepHeader from "@/components/StepHeader";
 import { CROPS, FALLOW } from "@/data/crops";
 import type { DemoLocation } from "@/data/locations";
@@ -213,13 +216,102 @@ function Summary({ factsKey, facts }: { factsKey: string; facts: SummaryFacts })
   );
 }
 
+const RAIN_OPTIONS = [0, -10, -20, -30];
+const HEAT_OPTIONS = [0, 10, 20];
+
+function ScenarioControls({
+  scenario,
+  onChange,
+  climate,
+  shifted,
+}: {
+  scenario: Scenario;
+  onChange: (s: Scenario) => void;
+  climate: ClimateProfile;
+  shifted: ClimateProfile;
+}) {
+  const row = (
+    label: string,
+    options: number[],
+    value: number,
+    text: (v: number) => string,
+    short: (v: number) => string,
+    set: (v: number) => void,
+  ) => (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <p className="font-medium">{label}</p>
+      <div role="radiogroup" aria-label={label} className="flex rounded-full bg-background p-1">
+        {options.map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={value === v}
+            onClick={() => set(v)}
+            className={`flex-1 whitespace-nowrap rounded-full px-2 py-2 text-sm font-medium sm:flex-none sm:px-3 ${
+              value === v ? "bg-leaf text-white shadow-sm" : "text-muted hover:text-foreground"
+            }`}
+          >
+            <span className="sm:hidden" aria-hidden="true">
+              {short(v)}
+            </span>
+            <span className="sr-only sm:not-sr-only">{text(v)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+  const active = isScenario(scenario);
+  return (
+    <div className={`rounded-2xl border-2 p-4 sm:p-5 ${active ? "border-maize bg-maize-soft" : "border-line bg-card"}`}>
+      <h3 className="font-semibold">What if the weather changes?</h3>
+      <p className="mt-1 text-sm text-muted">
+        Replay the last 45 seasons with less rain or more heat, and see which options still hold up.
+      </p>
+      <div className="mt-4 flex flex-col gap-3">
+        {row(
+          "Rain each season",
+          RAIN_OPTIONS,
+          scenario.rainPct,
+          (v) => (v === 0 ? "As it was" : `${-v}% less`),
+          (v) => (v === 0 ? "As was" : `−${-v}%`),
+          (v) => onChange({ ...scenario, rainPct: v }),
+        )}
+        {row(
+          "Hot days (over 32 °C)",
+          HEAT_OPTIONS,
+          scenario.extraHotDays,
+          (v) => (v === 0 ? "As it was" : `+${v} days`),
+          (v) => (v === 0 ? "As was" : `+${v} days`),
+          (v) => onChange({ ...scenario, extraHotDays: v }),
+        )}
+      </div>
+      {active && (
+        <p className="mt-4 text-sm">
+          Showing <strong>{describeScenario(scenario)}</strong>. Drought seasons: {climate.summary.droughtSeasons.length} →{" "}
+          <strong>{shifted.summary.droughtSeasons.length}</strong> of {climate.summary.seasons}; rain you can rely on:{" "}
+          {climate.summary.reliableRainMm} → <strong>{shifted.summary.reliableRainMm} mm</strong>. Rain start dates and dry
+          spells are kept as they were, so a real drier future could be harder still.{" "}
+          <button type="button" onClick={() => onChange(NO_SCENARIO)} className="font-medium text-clay underline">
+            Back to past weather
+          </button>
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function RotationPlanner({
   location,
-  climate,
+  climate: pastClimate,
+  terrain,
 }: {
   location: DemoLocation;
   climate: ClimateProfile;
+  terrain: Terrain | null;
 }) {
+  const [scenario, setScenario] = useState<Scenario>(NO_SCENARIO);
+  const climate = useMemo(() => applyScenario(pastClimate, scenario), [pastClimate, scenario]);
   const [startingOut, setStartingOut] = useState(true);
   const [current, setCurrent] = useState(["maize", "maize", "maize"]);
   const [priorities, setPriorities] = useState<Priorities>({ water: 3, soil: 3, market: 3 });
@@ -261,14 +353,14 @@ export default function RotationPlanner({
   const treatAsNew = startingOut || allResting;
 
   const { results } = useMemo(
-    () => compareRotations(treatAsNew ? null : current, climate, priorities, prices, soil),
-    [treatAsNew, current, climate, priorities, prices, soil],
+    () => compareRotations(treatAsNew ? null : current, climate, priorities, prices, soil, terrain),
+    [treatAsNew, current, climate, priorities, prices, soil, terrain],
   );
   const facts = useMemo(
-    () => buildFacts(location.name, climate, results, treatAsNew, soil),
-    [location, climate, results, treatAsNew, soil],
+    () => buildFacts(location.name, climate, results, treatAsNew, soil, isScenario(scenario) ? describeScenario(scenario) : null),
+    [location, climate, results, treatAsNew, soil, scenario],
   );
-  const factsKey = JSON.stringify([location.id, treatAsNew, current, priorities, prices, soil]);
+  const factsKey = JSON.stringify([location.id, treatAsNew, current, priorities, prices, soil, scenario, terrain]);
 
   // Suggestions first; what the farmer grows now (or the usual practice) last, for comparison.
   const ordered = [...results.slice(1), results[0]];
@@ -386,12 +478,14 @@ export default function RotationPlanner({
           title={`Your options for ${location.name}`}
           lead="Each option is three seasons, one crop per season, and then it repeats. The score shows how well it fits this area and what you said matters to you."
         />
+        <ScenarioControls scenario={scenario} onChange={setScenario} climate={pastClimate} shifted={climate} />
         <Summary factsKey={factsKey} facts={facts} />
         <div className="grid gap-5 lg:grid-cols-3">
           {ordered.map((r) => (
             <RotationCard key={r.kind} result={r} />
           ))}
         </div>
+        <FarmingCalendar results={ordered} climate={climate} />
         <aside className="rounded-2xl border border-line bg-card p-5 text-sm leading-relaxed text-muted">
           <h3 className="font-semibold text-foreground">What this tool can&apos;t tell you</h3>
           <p className="mt-1">

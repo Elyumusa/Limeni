@@ -39,7 +39,7 @@
  *   general figures, not checked against a Zambian source.
  *
  * NOT from a cited source (general agronomy, still to be checked locally):
- *   droughtTolerance, nitrogen, deepRooted, market.
+ *   droughtTolerance, nitrogen, deepRooted, groundCover, market.
  *
  * null means no figure was found. Nothing here is estimated to fill a gap.
  */
@@ -76,6 +76,8 @@ export type Crop = {
   /** Effect on soil nitrogen: fixes it, or how heavily it feeds. */
   nitrogen: "fixes" | "light feeder" | "moderate feeder" | "heavy feeder";
   deepRooted: boolean;
+  /** How well the crop covers the ground in the rains, protecting soil from washing away. */
+  groundCover: "low" | "medium" | "high";
   /** How easy it is to sell: 1 = mostly home use or thin market, 3 = established buyers. */
   market: 1 | 2 | 3;
   /** National average market price, ZMW per kg, June–August 2025. */
@@ -102,6 +104,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 2,
     nitrogen: "heavy feeder",
     deepRooted: false,
+    groundCover: "low",
     market: 3,
     priceZmwPerKg: 5.52,
     yieldTPerHa: 1.68,
@@ -123,6 +126,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 4,
     nitrogen: "moderate feeder",
     deepRooted: true,
+    groundCover: "low",
     market: 1,
     priceZmwPerKg: 15.95,
     yieldTPerHa: 1.04,
@@ -144,6 +148,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 5,
     nitrogen: "light feeder",
     deepRooted: true,
+    groundCover: "low",
     market: 1,
     priceZmwPerKg: 15.93,
     yieldTPerHa: null,
@@ -165,6 +170,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 2,
     nitrogen: "fixes",
     deepRooted: false,
+    groundCover: "medium",
     market: 3,
     priceZmwPerKg: 9.44,
     yieldTPerHa: 0.98,
@@ -186,6 +192,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 3,
     nitrogen: "fixes",
     deepRooted: false,
+    groundCover: "high",
     market: 2,
     priceZmwPerKg: 32.83,
     yieldTPerHa: 0.6,
@@ -207,6 +214,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 4,
     nitrogen: "fixes",
     deepRooted: false,
+    groundCover: "high",
     market: 2,
     priceZmwPerKg: null,
     yieldTPerHa: 0.19,
@@ -228,6 +236,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 2,
     nitrogen: "fixes",
     deepRooted: false,
+    groundCover: "medium",
     market: 3,
     priceZmwPerKg: 36.5,
     yieldTPerHa: 0.48,
@@ -249,6 +258,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 5,
     nitrogen: "fixes",
     deepRooted: true,
+    groundCover: "medium",
     market: 1,
     priceZmwPerKg: null,
     yieldTPerHa: null,
@@ -270,6 +280,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 4,
     nitrogen: "moderate feeder",
     deepRooted: true,
+    groundCover: "low",
     market: 2,
     priceZmwPerKg: 7.04,
     yieldTPerHa: 0.32,
@@ -291,6 +302,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 3,
     nitrogen: "moderate feeder",
     deepRooted: true,
+    groundCover: "low",
     market: 2,
     priceZmwPerKg: null,
     yieldTPerHa: null,
@@ -312,6 +324,7 @@ export const CROPS: Crop[] = [
     droughtTolerance: 3,
     nitrogen: "light feeder",
     deepRooted: false,
+    groundCover: "high",
     market: 2,
     priceZmwPerKg: 3.87,
     yieldTPerHa: 2.4,
@@ -339,6 +352,7 @@ export const FALLOW: Crop = {
   droughtTolerance: 5,
   nitrogen: "light feeder",
   deepRooted: false,
+  groundCover: "low",
   market: 1,
   priceZmwPerKg: null,
   yieldTPerHa: null,

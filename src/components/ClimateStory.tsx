@@ -12,7 +12,9 @@ import {
   YAxis,
 } from "recharts";
 import type { DemoLocation } from "@/data/locations";
-import type { ClimateProfile } from "@/lib/climate";
+import Glossary from "@/components/Glossary";
+import { quantile, type ClimateProfile } from "@/lib/climate";
+import type { Terrain } from "@/lib/terrain";
 
 const RAIN = "#1f6b3a";
 const DROUGHT = "#d99a1e";
@@ -35,12 +37,24 @@ function signed(n: number, unit: string) {
 export default function ClimateStory({
   location,
   profile,
+  terrain,
 }: {
   location: DemoLocation;
   profile: ClimateProfile;
+  /** undefined while loading, null if the lookup failed. */
+  terrain?: Terrain | null;
 }) {
   const s = profile.summary;
   const drySpellSeasons = Math.round(s.drySpellRisk * 10);
+
+  // Root-zone soil wetness (Jan–Mar) compared with this area's usual level, in percentage points.
+  const wet = profile.seasons.filter((x) => x.rootWetness !== null);
+  const usualWet = wet.length ? quantile(wet.map((x) => x.rootWetness as number), 0.5) : null;
+  const wetness = wet.map((x) => ({
+    label: x.label,
+    anomaly: Math.round(((x.rootWetness as number) - (usualWet as number)) * 100),
+  }));
+  const RISK_WORD = { low: "Low", moderate: "Moderate", high: "High" };
 
   return (
     <section className="flex flex-col gap-6">
@@ -80,6 +94,22 @@ export default function ClimateStory({
           value={signed(s.rainTrendMmPerDecade, "mm")}
           note="Change in season rainfall per decade"
         />
+        <Stat
+          label="Soil moisture, Jan–Mar"
+          value={usualWet === null ? "—" : `${Math.round(usualWet * 100)}% wet`}
+          note="How full of water the root zone usually is in the main growing months. 100% is waterlogged."
+        />
+        <Stat
+          label="Slope around here"
+          value={terrain === undefined ? "Checking…" : terrain === null ? "—" : `${terrain.slopePct}%`}
+          note={
+            terrain
+              ? `${RISK_WORD[terrain.erosionRisk]} risk of soil washing away in heavy rain. From NASA SRTM elevation (${terrain.elevationM} m above sea level).`
+              : terrain === null
+                ? "Elevation data isn't available right now."
+                : "Reading NASA SRTM elevation data."
+          }
+        />
       </div>
 
       <div>
@@ -109,6 +139,35 @@ export default function ClimateStory({
         </div>
       </div>
 
+      {wetness.length > 0 && (
+        <div>
+          <h3 className="font-medium text-foreground">Was the soil wetter or drier than usual?</h3>
+          <p className="text-sm text-muted">
+            Root-zone soil moisture in January–March each season, compared with what is normal here.{" "}
+            <span style={{ color: DROUGHT }} className="font-medium">
+              Gold
+            </span>{" "}
+            bars mean drier soil than usual, when crops are more likely to wilt.
+          </p>
+          <div className="mt-2 h-44">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={wetness} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="#e4ddcf" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={4} tickLine={false} />
+                <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} unit="%" width={48} />
+                <Tooltip formatter={(v) => [`${Number(v) > 0 ? "+" : ""}${v} points`, "Compared with usual"]} />
+                <ReferenceLine y={0} stroke="#231d16" />
+                <Bar dataKey="anomaly">
+                  {wetness.map((x) => (
+                    <Cell key={x.label} fill={x.anomaly < 0 ? DROUGHT : RAIN} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       <div>
         <h3 className="font-medium text-foreground">A typical farming year</h3>
         <p className="text-sm text-muted">Average rainfall by month, July to June.</p>
@@ -126,9 +185,11 @@ export default function ClimateStory({
       </div>
 
       <p className="text-sm text-muted">
-        Rainfall: CHIRPS satellite and rain-gauge records (about 5 km across), through NASA SERVIR. Temperature:
-        NASA POWER (about 50 km). Treat these as your area&apos;s climate, not a measurement of your exact field.
+        Rainfall: CHIRPS satellite and rain-gauge records (about 5 km across), through NASA SERVIR. Temperature and
+        soil moisture: NASA POWER (about 50 km). Slope: NASA SRTM elevation. Treat these as your area&apos;s
+        conditions, not a measurement of your exact field.
       </p>
+      <Glossary />
     </section>
   );
 }

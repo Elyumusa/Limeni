@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ClimateStory from "@/components/ClimateStory";
 import type { MapPoint } from "@/components/FieldMap";
 import PlaceSearch, { type PlacePick } from "@/components/PlaceSearch";
@@ -11,6 +11,7 @@ import { CLIMATE } from "@/data/climate";
 import { GIBS_LAYERS } from "@/data/gibs";
 import { LOCATIONS, zoneFor, type DemoLocation } from "@/data/locations";
 import type { ClimateProfile } from "@/lib/climate";
+import type { Terrain } from "@/lib/terrain";
 
 // Leaflet needs the browser, so the map is loaded on the client only.
 const FieldMap = dynamic(() => import("@/components/FieldMap"), {
@@ -41,6 +42,8 @@ export default function Explorer() {
   const [custom, setCustom] = useState<Custom | null>(null);
   const [layerId, setLayerId] = useState<string>("none");
   const ticket = useRef(0);
+  // Slope from NASA SRTM, keyed by point so a stale answer is never shown for a new spot.
+  const [terrain, setTerrain] = useState<{ key: string; value: Terrain | null } | null>(null);
 
   const layer = GIBS_LAYERS.find((l) => l.id === layerId) ?? null;
 
@@ -114,6 +117,21 @@ export default function Explorer() {
     location = LOCATIONS.find((l) => l.id === selectedId) ?? null;
     climate = location ? CLIMATE[location.id] : null;
   }
+
+  const pointKey = location ? `${location.lat.toFixed(3)},${location.lon.toFixed(3)}` : null;
+  useEffect(() => {
+    if (!pointKey) return;
+    const [lat, lon] = pointKey.split(",");
+    let live = true;
+    fetch(`/api/terrain?lat=${lat}&lon=${lon}`)
+      .then((r) => r.json())
+      .then((d: { terrain: Terrain | null }) => live && setTerrain({ key: pointKey, value: d.terrain }))
+      .catch(() => live && setTerrain({ key: pointKey, value: null }));
+    return () => {
+      live = false;
+    };
+  }, [pointKey]);
+  const terrainNow = terrain && terrain.key === pointKey ? terrain.value : undefined;
 
   return (
     <div id="plan" className="flex scroll-mt-4 flex-col gap-16">
@@ -223,9 +241,9 @@ export default function Explorer() {
               title={`The weather in ${location.name}`}
               lead="What 45 years of satellite records say about rain and heat here. This is what decides which crops can thrive."
             />
-            <ClimateStory location={location} profile={climate} />
+            <ClimateStory location={location} profile={climate} terrain={terrainNow} />
           </section>
-          <RotationPlanner location={location} climate={climate} />
+          <RotationPlanner location={location} climate={climate} terrain={terrainNow ?? null} />
         </>
       ) : (
         <section className="rounded-2xl border border-dashed border-line p-8 text-center text-muted">

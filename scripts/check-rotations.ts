@@ -41,3 +41,12 @@ const withSoil = compareRotations(null, CLIMATE.kasama, cases[0][1], {}, acid);
 console.log("  Suitability: " + withSoil.fits.map((f) => `${f.crop.name} ${f.score}`).join(", "));
 for (const r of withSoil.results) console.log(`  ${r.kind.padEnd(11)} ${r.crops.map((c) => c.name).join(" → ")}  overall ${r.scores.overall}`);
 console.log("  risks (best): " + withSoil.results[1].risks.join(" | "));
+
+console.log("\nMkushi, steep land (10% slope), balanced:");
+const steep = compareRotations(null, CLIMATE.mkushi, cases[0][1], {}, {}, { elevationM: 1300, slopePct: 10, erosionRisk: "high" });
+for (const r of steep.results) console.log(`  ${r.kind.padEnd(11)} ${r.crops.map((c) => c.name).join(" → ")}  overall ${r.scores.overall} soil ${r.scores.soil}`);
+
+import { applyScenario } from "../src/lib/scenario";
+console.log("\nSinazongwe, 20% less rain and 15 more hot days:");
+const dry = compareRotations(null, applyScenario(CLIMATE.sinazongwe, { rainPct: -20, extraHotDays: 15 }), cases[0][1]);
+for (const r of dry.results) console.log(`  ${r.kind.padEnd(11)} ${r.crops.map((c) => c.name).join(" → ")}  overall ${r.scores.overall} water ${r.scores.water} fit ${r.scores.fit}`);
