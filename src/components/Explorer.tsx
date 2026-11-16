@@ -12,6 +12,7 @@ import { CLIMATE } from "@/data/climate";
 import { GIBS_LAYERS } from "@/data/gibs";
 import { LOCATIONS, zoneFor, type DemoLocation } from "@/data/locations";
 import type { ClimateProfile } from "@/lib/climate";
+import { cachedClimate, climateErrorMessage, loadClimate } from "@/lib/climateClient";
 import { centroid, distanceM, formatCoords, formatHa, polygonAreaHa, type LatLon } from "@/lib/geo";
 import { findClearHls, formatDay, type HlsImage } from "@/lib/hls";
 import type { Terrain } from "@/lib/terrain";
@@ -25,25 +26,55 @@ const FieldMap = dynamic(() => import("@/components/FieldMap"), {
 type Custom = {
   point: MapPoint;
   detail: string;
+  /** Rainfall grid cell of the point (lib/cell): which weather answer belongs here. */
+  cell: string;
   status: "loading" | "done" | "error";
   progress: number;
   profile?: ClimateProfile;
   error?: string;
 };
 
-type ClimateReply =
-  | { status: "done"; profile: ClimateProfile }
-  | { status: "pending"; jobs?: string[]; progress?: number }
-  | { error: string };
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Slope answers already fetched this visit, by query. Failures are not kept, so they can be retried. */
+const terrains = new Map<string, Promise<Terrain | null>>();
+function terrainFor(query: string): Promise<Terrain | null> {
+  let p = terrains.get(query);
+  if (!p) {
+    p = fetch(`/api/terrain?${query}`)
+      .then((r) => r.json())
+      .then((d: { terrain: Terrain | null }) => {
+        if (!d.terrain) terrains.delete(query);
+        return d.terrain;
+      })
+      .catch(() => {
+        terrains.delete(query);
+        return null;
+      });
+    terrains.set(query, p);
+  }
+  return p;
+}
 
 /** How the farmer chose a spot. It decides how far the map zooms in. */
 type PickHow = "search" | "tap" | "exact" | "drag" | "field";
 const ZOOM_FOR: Record<PickHow, number | null> = { search: 11, tap: 8, exact: 16, drag: null, field: null };
 
-/** Rainfall is ~5 km data: moving within the same 0.01° cell needn't download it again. */
-const cellKey = (lat: number, lon: number) => `${lat.toFixed(2)},${lon.toFixed(2)}`;
+/** Place names for points already looked up this visit (about 100 m apart counts as the same). */
+const placeNames = new Map<string, Promise<PlacePick | null>>();
+function placeNameNear(lat: number, lon: number): Promise<PlacePick | null> {
+  const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+  let p = placeNames.get(key);
+  if (!p) {
+    p = fetch(`/api/places?lat=${lat}&lon=${lon}`)
+      .then((r) => r.json())
+      .then((d: { place: PlacePick | null }) => d.place)
+      .catch(() => {
+        placeNames.delete(key); // let a later try ask again
+        return null;
+      });
+    placeNames.set(key, p);
+  }
+  return p;
+}
 
 type Field = { points: LatLon[]; areaHa: number };
 const FIELD_KEY = "limeni.field.v1";
@@ -56,7 +87,6 @@ export default function Explorer() {
   const [selectedId, setSelectedId] = useState<string | null>("mkushi");
   const [custom, setCustom] = useState<Custom | null>(null);
   const [layerId, setLayerId] = useState<string>("none");
-  const ticket = useRef(0);
   // Slope from NASA SRTM, keyed by point so a stale answer is never shown for a new spot.
   const [terrain, setTerrain] = useState<{ key: string; value: Terrain | null } | null>(null);
   const [base, setBase] = useState<BaseMap>("map");
@@ -88,19 +118,13 @@ export default function Explorer() {
   }
 
   function pickDemo(id: string) {
-    ticket.current++;
     setCustom(null);
     setSelectedId(id);
     const loc = LOCATIONS.find((l) => l.id === id);
     if (loc) moveMap(loc.lat, loc.lon, 6);
   }
 
-  async function pickPoint(place: { lat: number; lon: number; name?: string; detail?: string }, how: PickHow) {
-    // Same ~5 km rainfall cell as the spot already chosen: keep its weather
-    // (or its download in progress) and only move the pin.
-    const sameCell =
-      custom !== null && custom.status !== "error" && cellKey(custom.point.lat, custom.point.lon) === cellKey(place.lat, place.lon);
-    const my = sameCell ? ticket.current : ++ticket.current;
+  function pickPoint(place: { lat: number; lon: number; name?: string; detail?: string }, how: PickHow) {
     const named = how === "search" && !!place.name;
     const zoom = ZOOM_FOR[how];
     if (zoom !== null) moveMap(place.lat, place.lon, zoom);
@@ -110,55 +134,43 @@ export default function Explorer() {
     const exactDetail = how === "search" ? "" : formatCoords(place);
     const point = { lat: place.lat, lon: place.lon, name: place.name ?? formatCoords(place, 2) };
     const detail = named ? (place.detail ?? "") : exactDetail;
-    setCustom((c) =>
-      sameCell && c ? { ...c, point, detail } : { point, detail, status: "loading", progress: 0 },
+
+    // Weather: from the phone, a download already running, or a new one.
+    // Answers are matched by rainfall cell, so a late answer for a spot the
+    // farmer has left is stored but never shown on the wrong spot.
+    const known = cachedClimate(place.lat, place.lon);
+    const { key, promise, progress: soFar } = loadClimate(place.lat, place.lon, (progress) =>
+      setCustom((c) => (c && c.cell === key && c.status === "loading" ? { ...c, progress } : c)),
     );
-    const update = (patch: Partial<Custom>) =>
-      my === ticket.current && setCustom((c) => (c ? { ...c, ...patch, point: { ...c.point, ...patch.point } } : c));
+    setCustom(
+      known
+        ? { point, detail, cell: key, status: "done", progress: 100, profile: known }
+        : { point, detail, cell: key, status: "loading", progress: soFar },
+    );
+    if (!known)
+      promise
+        .then((profile) =>
+          setCustom((c) => (c && c.cell === key ? { ...c, status: "done", progress: 100, profile } : c)),
+        )
+        .catch((error: unknown) =>
+          setCustom((c) => (c && c.cell === key ? { ...c, status: "error", error: climateErrorMessage(error) } : c)),
+        );
 
-    // Typed, tapped and dragged points have no place name yet: look one up while the weather loads.
-    if (!named) {
-      fetch(`/api/places?lat=${place.lat}&lon=${place.lon}`)
-        .then((r) => r.json())
-        .then(({ place: p }: { place: PlacePick | null }) => {
-          // Only name the pin if it hasn't moved again since.
-          if (p)
-            setCustom((c) =>
-              c && c.point.lat === place.lat && c.point.lon === place.lon
-                ? {
-                    ...c,
-                    point: { ...c.point, name: `Near ${p.name}` },
-                    detail: [p.detail, exactDetail].filter(Boolean).join(" · "),
-                  }
-                : c,
-            );
-        })
-        .catch(() => {});
-    }
-    if (sameCell) return;
-
-    try {
-      let reply = (await (
-        await fetch("/api/climate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lat: place.lat, lon: place.lon }),
-        })
-      ).json()) as ClimateReply;
-      const jobs = "jobs" in reply ? reply.jobs : undefined;
-      while ("status" in reply && reply.status === "pending") {
-        if (my !== ticket.current) return;
-        await sleep(4000);
-        reply = (await (
-          await fetch(`/api/climate?lat=${place.lat}&lon=${place.lon}&jobs=${(jobs ?? []).join(",")}`)
-        ).json()) as ClimateReply;
-        if ("status" in reply && reply.status === "pending") update({ progress: reply.progress ?? 0 });
-      }
-      if ("error" in reply) update({ status: "error", error: reply.error });
-      else update({ status: "done", progress: 100, profile: reply.profile });
-    } catch {
-      update({ status: "error", error: "Could not reach the weather service. Check your connection and try again." });
-    }
+    // Typed, tapped and dragged points have no place name yet: look one up.
+    if (!named)
+      placeNameNear(place.lat, place.lon).then((p) => {
+        // Only name the pin if it hasn't moved again since.
+        if (p)
+          setCustom((c) =>
+            c && c.point.lat === place.lat && c.point.lon === place.lon
+              ? {
+                  ...c,
+                  point: { ...c.point, name: `Near ${p.name}` },
+                  detail: [p.detail, exactDetail].filter(Boolean).join(" · "),
+                }
+              : c,
+          );
+      });
   }
 
   // The location and climate the rest of the page works from.
@@ -192,10 +204,7 @@ export default function Explorer() {
   useEffect(() => {
     if (!pointKey) return;
     let live = true;
-    fetch(`/api/terrain?${pointKey}`)
-      .then((r) => r.json())
-      .then((d: { terrain: Terrain | null }) => live && setTerrain({ key: pointKey, value: d.terrain }))
-      .catch(() => live && setTerrain({ key: pointKey, value: null }));
+    terrainFor(pointKey).then((value) => live && setTerrain({ key: pointKey, value }));
     return () => {
       live = false;
     };
