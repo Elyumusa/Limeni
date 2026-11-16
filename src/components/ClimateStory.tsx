@@ -14,17 +14,24 @@ import {
 import type { DemoLocation } from "@/data/locations";
 import Glossary from "@/components/Glossary";
 import { quantile, type ClimateProfile } from "@/lib/climate";
+import { rainTrendMeaning, reliableRainMeaning, seasonLengthMeaning, soilWetnessMeaning } from "@/lib/explain";
 import type { Terrain } from "@/lib/terrain";
 
 const RAIN = "#1f6b3a";
 const DROUGHT = "#d99a1e";
 
-function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+function Stat({ label, value, note, meaning }: { label: string; value: string; note: string; meaning?: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-card p-3 sm:p-4">
+    <div className="flex flex-col rounded-2xl border border-line bg-card p-3 sm:p-4">
       <p className="text-sm text-muted">{label}</p>
       <p className="mt-1 text-xl font-semibold sm:text-2xl">{value}</p>
       <p className="mt-1 text-xs leading-snug text-muted sm:text-sm">{note}</p>
+      {meaning && (
+        <p className="mt-3 rounded-xl bg-leaf-soft px-3 py-2 text-xs leading-snug text-foreground sm:text-sm">
+          <span className="font-semibold text-leaf-dark">What it means: </span>
+          {meaning}
+        </p>
+      )}
     </div>
   );
 }
@@ -55,6 +62,8 @@ export default function ClimateStory({
     anomaly: Math.round(((x.rootWetness as number) - (usualWet as number)) * 100),
   }));
   const RISK_WORD = { low: "Low", moderate: "Moderate", high: "High" };
+  const trend = rainTrendMeaning(profile);
+  const soilWet = usualWet === null ? null : soilWetnessMeaning(usualWet);
 
   return (
     <section className="flex flex-col gap-6">
@@ -67,40 +76,47 @@ export default function ClimateStory({
         <Stat
           label="Rains usually start"
           value={s.medianOnsetDate ?? "—"}
-          note="Middle date across all seasons"
+          note="In half of the years the rains start earlier than this, and in half later."
+          meaning="Plant when the ground is properly wet, after a good soaking rain, not on a fixed date. A few early showers followed by dry days can make seeds sprout and then die."
         />
         <Stat
           label="Rain you can rely on"
           value={`${s.reliableRainMm} mm`}
-          note={`Reached in 4 seasons out of 5. Typical season: ${s.medianRainMm} mm`}
+          note={`In 4 years out of 5, at least this much rain falls in the season. A normal year brings about ${s.medianRainMm} mm.`}
+          meaning={reliableRainMeaning(s.reliableRainMm)}
         />
         <Stat
           label="Reliable growing season"
           value={s.reliableLengthDays === null ? "—" : `${s.reliableLengthDays} days`}
-          note="From the start of the rains to the last rains, 4 seasons out of 5"
+          note="In 4 years out of 5, the rains last at least this long, from the first planting rains to the last rains."
+          meaning={s.reliableLengthDays === null ? undefined : seasonLengthMeaning(s.reliableLengthDays)}
         />
         <Stat
           label="Mid-season dry spells"
           value={`${drySpellSeasons} in 10 seasons`}
-          note="Seasons with 10 or more dry days in a row in January–February"
+          note="Years with 10 or more dry days in a row in January–February."
+          meaning="That is when many crops are flowering and filling their grain, so a dry spell then hurts the harvest most. Drought-hardy crops and mulch help."
         />
         <Stat
           label="Hot days"
           value={`${s.meanHotDays} per season`}
-          note={`Days above 32 °C, December–March. Trend: ${signed(s.hotDaysTrendPerDecade, "days per decade")}`}
+          note={`Days above 32 °C, December–March. Change: ${signed(s.hotDaysTrendPerDecade, "days every 10 years")}.`}
+          meaning="Very hot days dry out the soil faster and can stop maize and beans from setting grain when they flower."
         />
         <Stat
-          label="Rainfall trend"
-          value={signed(s.rainTrendMmPerDecade, "mm")}
-          note="Change in season rainfall per decade"
+          label="Is the rain changing?"
+          value={trend.word}
+          note={`Change in season rainfall: ${signed(s.rainTrendMmPerDecade, "mm every 10 years")}, over ${s.seasons} years of records.`}
+          meaning={trend.meaning}
         />
         <Stat
-          label="Soil moisture, Jan–Mar"
-          value={usualWet === null ? "—" : `${Math.round(usualWet * 100)}% wet`}
-          note="How full of water the root zone usually is in the main growing months. 100% is waterlogged."
+          label="How wet the soil stays, Jan–Mar"
+          value={usualWet === null || !soilWet ? "—" : `${soilWet.word} (${Math.round(usualWet * 100)}%)`}
+          note="How full of water the soil around plant roots usually is in the main growing months. 0% is bone dry; 100% is soaked through."
+          meaning={soilWet?.meaning}
         />
         <Stat
-          label="Slope around here"
+          label={terrain?.basis === "field" ? "Slope of your field" : "Slope around here"}
           value={terrain === undefined ? "Checking…" : terrain === null ? "—" : `${terrain.slopePct}%`}
           note={
             terrain
@@ -108,6 +124,16 @@ export default function ClimateStory({
               : terrain === null
                 ? "Elevation data isn't available right now."
                 : "Reading NASA SRTM elevation data."
+          }
+          meaning={
+            !terrain
+              ? undefined
+              : `A ${terrain.slopePct}% slope means the ground drops about ${Math.round(terrain.slopePct)} m over 100 m. ` +
+                (terrain.erosionRisk === "low"
+                  ? "That is nearly flat, so heavy rain rarely washes soil away."
+                  : terrain.erosionRisk === "moderate"
+                    ? "Heavy rain can wash bare soil away: plant across the slope and keep the ground covered."
+                    : "Heavy rain washes bare soil away easily: plant across the slope, build contour ridges and keep the ground covered.")
           }
         />
       </div>
@@ -186,8 +212,9 @@ export default function ClimateStory({
 
       <p className="text-sm text-muted">
         Rainfall: CHIRPS satellite and rain-gauge records (about 5 km across), through NASA SERVIR. Temperature and
-        soil moisture: NASA POWER (about 50 km). Slope: NASA SRTM elevation. Treat these as your area&apos;s
-        conditions, not a measurement of your exact field.
+        soil moisture: NASA POWER (about 50 km). Treat the weather as your area&apos;s conditions, not a measurement
+        of your exact field. Slope: NASA SRTM elevation (30 m),{" "}
+        {terrain?.basis === "field" ? "across the field you drew" : "around your spot; draw your field for its own slope"}.
       </p>
       <Glossary />
     </section>

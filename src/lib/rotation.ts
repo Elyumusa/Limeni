@@ -247,7 +247,7 @@ function explain(
   for (const c of distinct) evidence.push(...(fits.get(c.id) as CropFit).soil.notes);
   if (terrain)
     evidence.push(
-      `NASA SRTM elevation: the land around this point slopes about ${terrain.slopePct}% (${terrain.erosionRisk} erosion risk).`,
+      `NASA SRTM elevation: ${terrain.basis === "field" ? "your field and the land just around it slope" : "the land around this point slopes"} about ${terrain.slopePct}% (${terrain.erosionRisk} erosion risk).`,
     );
   evidence.push(
     `Seasons with a dry spell of 10 or more days in January–February: ${Math.round(s.drySpellRisk * s.seasons)} of ${s.seasons}.`,

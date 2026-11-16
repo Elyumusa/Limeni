@@ -46,6 +46,9 @@ Every option shows:
 |---|---|
 | Live weather for any point | Downloads CHIRPS rainfall and NASA POWER data for any spot in Zambia (20 s to 2 min) |
 | Place search | Autocomplete for towns, villages and roads in Zambia |
+| Exact farm location | Type or paste coordinates (decimal, degrees-minutes-seconds or a Google Maps link) or use the phone's GPS; the map flies to the farm in satellite view, and the pin can be dragged |
+| Draw your field | Tap the corners of a field to outline it; Limeni measures its area, saves it on the phone, measures the slope across it, and shows the expected harvest and income for that field |
+| Your farm up close | Finds the latest cloud-free NASA HLS (Landsat and Sentinel-2, 30 m) image of the farm, with older images on request |
 | “What if” scenarios | Replays 45 seasons with 10–30% less rain or 10–20 more hot days |
 | Farming calendar | Planting time, growing period, sensitive stage vs. dry-spell and heat months, bare-field months |
 | Soil input | pH (in water or CaCl₂), texture, drainage, organic carbon or fertility |
@@ -64,8 +67,10 @@ Every option shows:
 |---|---|
 | **CHIRPS** daily rainfall (UCSB / USGS), via **NASA SERVIR ClimateSERV** | Rain start, rain you can count on, dry spells, droughts, since 1981, ~5 km |
 | **NASA POWER** (MERRA-2) | Daily max/min temperature (heat stress) and root-zone soil moisture, ~50 km |
-| **NASA SRTM** 30 m elevation, via OpenTopoData | Slope and erosion risk |
+| **NASA SRTM** 30 m elevation, via OpenTopoData | Slope and erosion risk, around a spot or across a drawn field |
 | **NASA GIBS**: MODIS NDVI, SMAP, GPM IMERG | Map layers |
+| **NASA HLS** (Harmonized Landsat and Sentinel-2, 30 m), via NASA GIBS | A recent cloud-free image of the farm |
+| Esri World Imagery | High-resolution satellite base map for finding and outlining fields |
 | **FAO ECOCROP** | Each crop’s rainfall, temperature, pH, texture, fertility and drainage needs |
 | Zambia Ministry of Agriculture market bulletin | Default crop prices (June–August 2025) |
 | Zambia Crop Forecasting Survey 2024/25; FAO / ZamStats IAS 2023/24 | National average yields |

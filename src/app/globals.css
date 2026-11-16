@@ -54,3 +54,9 @@ body {
 .leaflet-bottom {
   z-index: 1 !important;
 }
+
+/* The farm pin is a plain SVG; drop Leaflet's default white box. */
+.limeni-pin {
+  background: none;
+  border: none;
+}

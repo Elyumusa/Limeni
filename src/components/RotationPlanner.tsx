@@ -11,6 +11,7 @@ import StepHeader from "@/components/StepHeader";
 import { CROPS, FALLOW } from "@/data/crops";
 import type { DemoLocation } from "@/data/locations";
 import type { ClimateProfile } from "@/lib/climate";
+import { formatHa } from "@/lib/geo";
 import { compareRotations, type PriceOverrides, type Priorities, type RotationResult } from "@/lib/rotation";
 import { buildFacts, templateSummary, type SummaryFacts, type SummaryResponse } from "@/lib/summary";
 
@@ -82,13 +83,30 @@ const PRICES_KEY = "limeni.prices.v1";
 const SOIL_KEY = "limeni.soil.v1";
 const kwacha = (n: number) => `K${n.toLocaleString("en-US")}`;
 
-function ValueLine({ value }: { value: RotationResult["value"] }) {
+const roundTo = (n: number, step: number) => Math.round(n / step) * step;
+
+function ValueLine({ value, fieldHa }: { value: RotationResult["value"]; fieldHa: number | null }) {
   if (value.covered.length === 0) return <>no price data for these crops yet.</>;
   const partial = value.missing.length ? `, counting only ${value.covered.join(" and ").toLowerCase()}` : "";
+  const prices = value.usesOwnPrices ? "your prices now" : "official market prices";
+  if (fieldHa !== null) {
+    const step = fieldHa < 1 ? 10 : 100;
+    return (
+      <>
+        about <strong>{kwacha(roundTo(value.zmwPerHa * fieldHa, step))}</strong> from your {formatHa(fieldHa)} field over
+        three seasons at {prices}
+        {value.zmwPerHaAtHarvest !== null && (
+          <>
+            , or <strong>{kwacha(roundTo(value.zmwPerHaAtHarvest * fieldHa, step))}</strong> at the harvest prices you expect
+          </>
+        )}
+        {partial}. Before costs.
+      </>
+    );
+  }
   return (
     <>
-      about <strong>{kwacha(value.zmwPerHa)}</strong> per hectare over three seasons at{" "}
-      {value.usesOwnPrices ? "your prices now" : "official market prices"}
+      about <strong>{kwacha(value.zmwPerHa)}</strong> per hectare over three seasons at {prices}
       {value.zmwPerHaAtHarvest !== null && (
         <>
           , or <strong>{kwacha(value.zmwPerHaAtHarvest)}</strong> at the harvest prices you expect
@@ -99,7 +117,31 @@ function ValueLine({ value }: { value: RotationResult["value"] }) {
   );
 }
 
-function RotationCard({ result }: { result: RotationResult }) {
+/** Expected harvest from the farmer's field each season, at national average yields. */
+function FieldHarvest({ crops, fieldHa }: { crops: RotationResult["crops"]; fieldHa: number }) {
+  const rows = crops.map((c, i) => {
+    if (c.family === "fallow") return { season: i + 1, text: "rest, no harvest" };
+    if (c.yieldTPerHa === null) return { season: i + 1, text: `${c.name}: no yield figure yet` };
+    const kg = c.yieldTPerHa * 1000 * fieldHa;
+    const amount = kg < 1000 ? `${roundTo(kg, 10).toLocaleString("en-US")} kg` : `${(kg / 1000).toFixed(1)} t`;
+    return { season: i + 1, text: `${c.name}: about ${amount} (${Math.round(kg / 50).toLocaleString("en-US")} bags of 50 kg)` };
+  });
+  return (
+    <div className="rounded-xl border border-line px-3 py-2 text-sm">
+      <p className="font-semibold">Harvest from your field</p>
+      <ul className="mt-1 flex flex-col gap-0.5">
+        {rows.map((r) => (
+          <li key={r.season}>
+            <span className="text-muted">Season {r.season}:</span> {r.text}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-xs text-muted">At Zambia&apos;s national average yields. Good farming can do better; a dry year, worse.</p>
+    </div>
+  );
+}
+
+function RotationCard({ result, fieldHa }: { result: RotationResult; fieldHa: number | null }) {
   const s = result.scores;
   const best = result.kind === "best";
   const baseline = result.kind === "current" || result.kind === "common";
@@ -150,8 +192,9 @@ function RotationCard({ result }: { result: RotationResult }) {
 
       <p className="rounded-xl bg-maize-soft px-3 py-2 text-sm">
         <span className="font-semibold">Rough value: </span>
-        <ValueLine value={result.value} />
+        <ValueLine value={result.value} fieldHa={fieldHa} />
       </p>
+      {fieldHa !== null && <FieldHarvest crops={result.crops} fieldHa={fieldHa} />}
 
       <Section title="Why this rotation" items={result.why} open />
       <Section title="Good things about it" items={result.benefits} open={!baseline} />
@@ -305,10 +348,13 @@ export default function RotationPlanner({
   location,
   climate: pastClimate,
   terrain,
+  fieldHa = null,
 }: {
   location: DemoLocation;
   climate: ClimateProfile;
   terrain: Terrain | null;
+  /** Size of the field the farmer drew, if any, so values can be for their field. */
+  fieldHa?: number | null;
 }) {
   const [scenario, setScenario] = useState<Scenario>(NO_SCENARIO);
   const climate = useMemo(() => applyScenario(pastClimate, scenario), [pastClimate, scenario]);
@@ -482,7 +528,7 @@ export default function RotationPlanner({
         <Summary factsKey={factsKey} facts={facts} />
         <div className="grid gap-5 lg:grid-cols-3">
           {ordered.map((r) => (
-            <RotationCard key={r.kind} result={r} />
+            <RotationCard key={r.kind} result={r} fieldHa={fieldHa} />
           ))}
         </div>
         <FarmingCalendar results={ordered} climate={climate} />
